@@ -1,0 +1,93 @@
+plugins {
+	id 'com.android.library'
+}
+
+android {
+	namespace 'com.rosstonovsky.catbox'
+	compileSdk 33
+
+	defaultConfig {
+		minSdk 21
+		targetSdk 33
+		consumerProguardFiles "consumer-rules.pro"
+	}
+
+	buildTypes {
+		release {
+			minifyEnabled false
+			proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+		}
+	}
+
+	compileOptions {
+		//to support Java 8 D8 is needed
+		sourceCompatibility JavaVersion.VERSION_1_7
+		sourceCompatibility JavaVersion.VERSION_1_7
+	}
+
+	task javaPBDexToClasses(type: JavaCompile) {
+		destinationDir = file("${projectDir}/build/classes/")
+		doFirst {
+			delete destinationDir.getAbsolutePath()
+			destinationDir.mkdirs()
+		}
+		sourceCompatibility JavaVersion.VERSION_1_7
+		sourceCompatibility JavaVersion.VERSION_1_7
+		dependsOn(':app:compileReleaseAidl')
+		source = ["src/main/java"]
+		//If build fails, check your sdk location and add it to classpath
+		classpath = files([
+				"${android.sdkDirectory}/platforms/android-" + compileSdk + "/android.jar",
+				"${android.sdkDirectory}/platforms/android-" + compileSdk + "/android-stubs-src.jar",
+				"${android.sdkDirectory}/platforms/android-" + compileSdk + "/core-for-system-modules.jar",
+				"${projectDir}/libs/additional-stub.jar",
+				"${projectDir}/libs/dev.rikka.tools.stub-4.2.0.jar"
+		])
+		options.sourcepath = files('src/main/java',
+				// include compiled aidl
+				"${rootProject.rootDir.path}/app/build/generated/aidl_source_output_dir/release/out")
+	}
+
+	task assembleDex(type: JavaExec) {
+		dependsOn('javaPBDexToClasses')
+		main = 'com.android.dx.command.Main'
+		classpath = files("$android.sdkDirectory/build-tools/${android.buildToolsVersion}/lib/dx.jar")
+		inputs.files(sourceSets.main.java.srcDirs)
+		args = [
+				'--dex',
+				'--verbose',
+				'--output',
+				"${rootProject.rootDir.path}/app/src/main/assets/catbox.dex",
+				projectDir.getAbsolutePath() + '/build/classes/'
+		]
+	}
+
+	//TODO
+	task assembleDexD8(type: JavaExec) {
+		dependsOn('javaPBDexToClasses')
+		main = 'com.android.tools.r8.D8'
+		classpath = files("$android.sdkDirectory/build-tools/${android.buildToolsVersion}/lib/d8.jar")
+		args = [
+				'--release',
+				'--min-api',
+				'21',
+				'--output',
+				"${rootProject.rootDir.path}/app/src/main/assets/catbox.jar",
+				"${rootProject.rootDir.path}/catdex/build/classes"
+		]
+	}
+
+	buildFeatures {
+		aidl true
+	}
+
+	sourceSets {
+		main {
+			aidl.srcDirs += '../app/src/main/aidl'
+		}
+	}
+}
+
+dependencies {
+	compileOnly fileTree(dir: 'libs', include: ['additional-stub.jar', 'dev.rikka.tools.stub-4.2.0.jar'])
+}
