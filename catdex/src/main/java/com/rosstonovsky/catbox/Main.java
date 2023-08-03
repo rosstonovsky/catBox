@@ -3,7 +3,6 @@ package com.rosstonovsky.catbox;
 import android.app.ActivityManagerNative;
 import android.app.ContentProviderHolder;
 import android.app.IActivityManager;
-import android.app.IActivityManagerPre26;
 import android.content.AttributionSource;
 import android.content.IContentProvider;
 import android.os.Build;
@@ -15,9 +14,12 @@ import android.os.ServiceManager;
 import android.system.Os;
 import android.util.Log;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+
 public class Main {
 
-	public static String TAG = "pussybox";
+	public static String TAG = "catbox";
 
 	public static void main(String[] args) {
 		if (Os.getuid() != 0) {
@@ -32,6 +34,14 @@ public class Main {
 			System.exit(0);
 			return;
 		}
+		//prevent from sending exit code 1
+		Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
+			@Override
+			public void uncaughtException(Thread thread, Throwable throwable) {
+				Log.e(TAG, "uncaughtException: ", throwable);
+				System.exit(0);
+			}
+		});
 		if (Looper.getMainLooper() == null) {
 			Looper.prepareMainLooper();
 		}
@@ -50,7 +60,7 @@ public class Main {
 		Log.i(TAG, "exiting...");
 	}
 
-	private static void sendBinder(final String packageName) throws RemoteException {
+	private static void sendBinder(final String packageName) throws RemoteException, NoSuchMethodException, InvocationTargetException, IllegalAccessException {
 		CatService service = new CatService();
 
 		IBinder binder = ServiceManager.getService("activity");
@@ -73,7 +83,8 @@ public class Main {
 			contentProviderHolder = am.getContentProviderExternal(authority, (int) userId, null);
 			provider = contentProviderHolder != null ? contentProviderHolder.provider : null;
 		} else {
-			provider = ((IActivityManagerPre26) am).getContentProviderExternal(authority, (int) userId, null).provider;
+			Method m = am.getClass().getDeclaredMethod("getContentProviderExternal", String.class, int.class, IBinder.class);
+			provider = ((IActivityManager.ContentProviderHolder) m.invoke(am, authority, (int) userId, null)).provider;
 		}
 
 		Bundle result;

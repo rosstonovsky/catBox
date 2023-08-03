@@ -31,7 +31,7 @@ public class CatManager {
 	 */
 	public static void init(@NotNull Context context) throws IOException, RuntimeException {
 		if (catService != null) {
-			Log.e(TAG, "CatManager.init: why did you call me twice? Chill bro, I'm already working");
+			Log.e(TAG, "CatManager.init: init already called");
 			return;
 		}
 		unpackCatDex(context);
@@ -40,13 +40,22 @@ public class CatManager {
 		try {
 			OutputStream out = new DataOutputStream(process.getOutputStream());
 			InputStream in = process.getInputStream();
+			String dex = "\"" + CatUser.getAppFilesFolder() + "/catbox.dex\"";
 
-			out.write(("app_process -cp \"" +
-					CatUser.getAppFilesFolder() +
-					//--application
-					"/catbox.dex\" /system/bin --nice-name=catbox com.rosstonovsky.catbox.Main " +
-					context.getPackageName() +
-					"\nexit\n")
+			/*
+			 Need both Djava.class.path and cp to work on some weird systems
+			 some arguments may not exist such as --nice-name or cmd dir
+			 */
+			out.write(("app_process -Djava.class.path=" + dex +
+							" -cp " + dex +
+							" /system/bin com.rosstonovsky.catbox.Main " +
+							context.getPackageName() +
+							" || " +
+							"app_process -Djava.class.path=" + dex +
+							" -cp " + dex +
+							" com.rosstonovsky.catbox.Main " +
+							context.getPackageName() +
+							"\nexit\n")
 					.getBytes(StandardCharsets.UTF_8));
 			out.flush();
 			//wait until got binder
@@ -55,7 +64,7 @@ public class CatManager {
 			switch (code) {
 				case 0:
 					if (catService == null) {
-						Log.e(TAG, "catService is null, we're fucked");
+						Log.e(TAG, "catService is null :(");
 						return;
 					}
 					Log.i(TAG, "Successfully got catService");
